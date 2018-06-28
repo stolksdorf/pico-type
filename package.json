@@ -1,0 +1,31 @@
+{
+  "name": "pico-type",
+  "version": "0.0.1",
+  "description": "A tiny custom schema checker for js",
+  "main": "pico-type.js",
+  "scripts": {
+    "test": "pico-check",
+    "dev": "pico-check -v -w",
+    "test:dev": "pico-check -v -w"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stolksdorf/pico-type.git"
+  },
+  "pico-check": {
+    "source": [
+      "*.js",
+      "**/*.js"
+    ]
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/stolksdorf/pico-type/issues"
+  },
+  "homepage": "https://github.com/stolksdorf/pico-type#readme",
+  "devDependencies": {
+    "pico-check": "^1.0.6"
+  }
+}
