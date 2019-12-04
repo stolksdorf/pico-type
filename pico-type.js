@@ -1,59 +1,44 @@
-const populateTypes = require('./types.js');
+const isPlainObject = (obj)=>typeof obj == 'object' && obj.constructor == Object;
+const isNativeType  = (func)=>/\[native code\]/.test(func+'');
+const getNativeName = (func)=>/function (\w+)\(\)/.exec(func+'')[1];
+const isEmpty       = (val)=>val==='' || val===null || typeof val === 'undefined';
 
-const check = (schema, value, isOptional=false)=>{
-	//console.log('SCHEMA', schema);
-	if(isOptional && typeof value == 'undefined') return undefined;
-
-	if(Picotype[schema]) return check(Picotype[schema], value);
-	if(typeof schema == 'function') return schema(value);
-
+const ensure = (schema, arg, name='')=>{
+	if(schema === '*') return true;
 	if(Array.isArray(schema)){
-		if(!Array.isArray(value)) return `value is not a array`;
-		return value.reduce((acc, val, idx)=>{
-			const res = check(schema[0], val);
-			if(res){
-				acc = acc || [];
-				acc[idx] = res;
-			}
-			return acc;
-		}, undefined);
+		if(!Array.isArray(arg)) throw `${name}: not an array.`;
+		return arg.every((val, idx)=>ensure(schema[0], val, `${name}[${idx}]`));
 	}
-	if(typeof schema === 'object'){
-		if(typeof value !== 'object') return `value is not an object`;
-		for(const key in value){
-			if(!schema[key]) return `${key} does not exist in schema`;
-		}
-		return Object.keys(schema).reduce((acc, key)=>{
-			//TODO: check here for question mark in key, if so, add in optional flag
-			//TODO: Add in Wildcard checks
-			const res = check(schema[key], value[key]);
-			if(res){
-				acc = acc || {};
-				acc[key] = res;
-			}
-			return acc;
-		}, undefined);
+	else if(isPlainObject(schema)){
+		if(!isPlainObject(arg)) throw `${name}: not an object.`;
+		return Object.entries(schema).every(([key,val])=>ensure(val, arg[key], `${name}.${key}`));
 	}
-	return `invalid schema type`;
+	else if(schema instanceof RegExp){
+		if(!schema.test(arg)) throw `${name}: did not pass regex; ${RegExp}.`;
+	}
+	else if(isNativeType(schema)){
+		if(arg instanceof schema) return true;
+		if(typeof arg == typeof schema()) return true;
+		throw `${name}: not ${getNativeName(schema)}.`
+	}
+	else if(typeof schema === 'function'){
+		const res = schema(arg, name);
+		if(res === true || typeof res == 'undefined') return true;
+		throw `${name}: ${res || `did not pass validation.`}`;
+	}
+	return true;
 };
 
-const Picotype = (schema)=>{
-	const newType = (val)=>newType.validate(val);
-	newType.is       = (obj)=>!check(schema, obj);
-	newType.validate = (obj)=>check(schema, obj);
-	newType.ensure   = (obj, force=false)=>{
-		if(Picotype.shouldThrow || force){
-			const result = check(schema, obj);
-			if(result) throw new Error(JSON.stringify(result, null, '  '));
-		}
-		return obj;
-	};
-	newType.schema=()=>schema;
-	Object.defineProperty(newType, 'isGeneratedType', {value : true});
-	return newType;
+const is = (type, val, name)=>{ try{ ensure(type, val, name); }catch(err){ return false; } return true;};
+
+const opt = (type)=>(val, name)=>isEmpty(val) || ensure(type, val, name);
+const or = (...types)=>(val, name)=>types.some((type)=>is(type, val, name));
+
+
+module.exports = {
+	ensure,
+	is,
+	opt,
+	or,
+	types : require('./types.js')
 };
-
-Picotype.shouldThrow = true;
-
-
-module.exports = populateTypes(Picotype);
