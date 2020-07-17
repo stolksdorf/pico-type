@@ -128,7 +128,7 @@ test.group('array', (test)=>{
 
 	map(rest, (values, type)=>{
 		test(`fails ${type}`, (t)=>{
-			values.map((val)=>t.throws(()=>ensure(Array, val)))
+			values.map((val)=>t.throws(()=>ensure(Array, val), val))
 		});
 	});
 });
