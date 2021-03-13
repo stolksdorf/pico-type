@@ -6,31 +6,29 @@ module.exports = {
 	basic : (t)=>{
 
 
-		let doot = wrap({bar: Number}, (foo, bar)=>{
+		let doot = wrap([null,Number], (foo, bar)=>{
 			return 6;
 		}, Number)
 
-		doot(true, 'yo')
+		doot(true, 7)
 
 
 	},
 
-	$async : (t)=>{
-
-
+	async : async (t)=>{
 		let doot = wrap(
 			null,
-			()=>wait(200, 5),
-			//String
+			(val)=>wait(10, val),
 			Number
 		);
 
+		let res = await doot(10);
 
-		return doot().then(x=>console.log(x))
+		t.arm();
+		res = await doot('foo').catch((err)=>{
+			t.disarm()
+		})
 
-
-
-
-
+		return true;
 	}
 }

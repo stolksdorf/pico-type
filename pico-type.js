@@ -1,36 +1,26 @@
 
-
-//BUMP: into a tuils file
-const isPlainObject = (obj)=>obj && typeof obj == 'object' && obj.constructor == Object;
 const isNativeType  = (func)=>/\[native code\]/.test(func+'');
 const getNativeName = (func)=>/function (\w+)\(\)/.exec(func+'')[1];
-const isEmpty       = (val)=>val==='' || val===null || typeof val === 'undefined';
-
-
-//FIXME: Breaks with default params with commas in them
-const getParamNames = (func)=>{
-	const fnStr = func.toString().replace(/((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg, '');
-	const result = fnStr.slice(fnStr.indexOf('(')+1, fnStr.indexOf(')')).match(/([^\s,]+)/g);
-	return (result || []).map(x=>x.split('=')[0]);
-}
-
-
+const isObj = (obj)=>obj && typeof obj == 'object' && obj.constructor == Object;
+const undef = (val)=>val==='' || val===null || typeof val === 'undefined';
 const INTERFACE = Symbol('interface');
 
+let disabled = false;
 
 const ensure = (interface, val, name='')=>{
+	if(disabled || interface === '*' || !interface) return true;
 	if(val && val[INTERFACE] === interface) return true; //Shortcut for cast'd values
-	if(interface === '*' || !interface) return true;
+
 	if(Array.isArray(interface)){
 		if(!Array.isArray(val)) throw new Error(`${name} is not an array. Given: ${val}`);
-		return val.every((val, idx)=>ensure(interface[0], val, `${name}[${idx}]`));
+		val.every((val, idx)=>ensure(interface[0], val, `${name}[${idx}]`));
 	}
-	else if(isPlainObject(interface)){
-		if(!isPlainObject(val)) throw new Error(`${name} is not an object. Given: ${val}`);
-		return Object.entries(interface).every(([key,val])=>ensure(val, val[key], `${name}.${key}`));
+	else if(isObj(interface)){
+		if(!isObj(val)) throw new Error(`${name} is not an object. Given: ${val}`);
+		Object.entries(interface).every(([key,int])=>ensure(int, val[key], `${name}.${key}`));
 	}
 	else if(interface instanceof RegExp){
-		if(!interface.test(val)) throw new Error(`${name} did not pass regex; ${RegExp}.`);
+		if(!interface.test(val)) throw new Error(`${name} did not pass regex; ${interface}.`);
 	}
 	else if(isNativeType(interface)){
 		if(val instanceof interface) return true;
@@ -39,7 +29,7 @@ const ensure = (interface, val, name='')=>{
 	}
 	else if(typeof interface === 'function'){
 		const res = interface(val, name);
-		if(res === true || typeof res == 'undefined') return true;
+		if(res === true || undef(res)) return true;
 		throw new Error(`${name} ${res || `did not pass validation.`}`);
 	}
 	return true;
@@ -47,41 +37,30 @@ const ensure = (interface, val, name='')=>{
 
 const is = (type, val, name)=>{ try{ ensure(type, val, name); }catch(err){ return false; } return true;};
 
-const opt = (type)=>(val, name)=>isEmpty(val) || ensure(type, val, name);
+const opt = (type)=>(val, name)=>undef(val) || ensure(type, val, name);
 const or = (...types)=>(val, name)=>types.some((type)=>is(type, val, name));
 
+const wrap = (argTypes, func, returnType)=>{
 
-
-
-
-
-
-const wrap = (paramInterfaces, func, returnInterface)=>{
-	//if(!disabled) return func;
-	let pi;
-	if(isPlainObject(paramInterfaces)){
-		pi = getParamNames(func).map((p)=>[paramInterfaces[p], `arg '${p}'`]);
-	}else if(Array.isArray(pi)){
-		pi = paramInterfaces.map((int, idx)=>[int, `arg ${idx}`]);
-	}
-
+	if(disabled) return func;
 	return (...args)=>{
-		if(pi) pi.map(([int, name], idx)=>ensure(int, args[idx], name));
+		if(argTypes) argTypes.map((int, idx)=>ensure(int, args[idx], `arg${idx}`));
 		const result = func(...args);
-		if(returnInterface){
+		if(returnType){
 			if(result instanceof Promise) return result.then((x)=>{
-				ensure(returnInterface, x, 'Return Value');
+				ensure(returnType, x, 'Return Value');
 				return x;
 			});
-			ensure(returnInterface, result, 'Return Value');
+			ensure(returnType, result, 'Return Value');
 		}
 		return result;
 	}
-}
+};
 
 const cast = (interface, initVal)=>{
-	if(initVal) ensure(interface, initVal);
-	const proxy = new Proxy(initVal||{}, {
+	if(disabled) return initVal;
+	if(!undef(initVal)) ensure(interface, initVal);
+	const proxy = new Proxy(initVal || {}, {
 		set: (obj, propName, value)=>{
 			ensure(interface[propName], value, propName);
 			obj[propName] = value;
@@ -90,7 +69,9 @@ const cast = (interface, initVal)=>{
 	});
 	proxy[INTERFACE] = interface;
 	return proxy;
-}
+};
+
+const type = (interface)=>ensure.bind(null, interface);
 
 
 module.exports = {
@@ -99,7 +80,7 @@ module.exports = {
 	ensure, is,
 	opt, or,
 
-	wrap,
-	cast,
-	types : require('./types.js')
+	wrap, cast, type,
+
+	disabled
 };

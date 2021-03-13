@@ -4,12 +4,11 @@ const UpdateUserName = check([UserType, String], (user, newName)=>{
 }, UserType)
 
 
-*/
 
 const wrap = (preTypes, func, postType)=>{
 	//if(disabled) return func;
 	return (...args)=>{
-		preTypes.map((type, idx)=>ensure(args[idx], type));
+		if(preTypes) preTypes.map((type, idx)=>ensure(args[idx], type));
 		const result = func(...args);
 		if(postType) ensure(result, postType);
 		return result;
@@ -23,7 +22,7 @@ const types = {
 			return ensure(type, val);
 		}
 	},
-	/** Custom Types **/
+	/** Custom Types
 	Lib.email = Lib((val)=>{
 		if(!/^.+@.+\..+$/.test(val)){
 			return `value is not formatted as an email.`;
@@ -102,3 +101,5 @@ const run = (schema, value, handle=(x, path)=>x, path='')=>{
 const ensure = (schema, value)=>run(schema, value, (x, path)=>{throw x});
 
 // Validate should return an error object;
+
+*/
