@@ -1,59 +1,86 @@
-const populateTypes = require('./types.js');
 
-const check = (schema, value, isOptional=false)=>{
-	//console.log('SCHEMA', schema);
-	if(isOptional && typeof value == 'undefined') return undefined;
+const isNativeType  = (func)=>/\[native code\]/.test(func+'');
+const getNativeName = (func)=>/function (\w+)\(\)/.exec(func+'')[1];
+const isObj = (obj)=>obj && typeof obj == 'object' && obj.constructor == Object;
+const undef = (val)=>val==='' || val===null || typeof val === 'undefined';
+const INTERFACE = Symbol('interface');
 
-	if(Picotype[schema]) return check(Picotype[schema], value);
-	if(typeof schema == 'function') return schema(value);
+let disabled = false;
 
-	if(Array.isArray(schema)){
-		if(!Array.isArray(value)) return `value is not a array`;
-		return value.reduce((acc, val, idx)=>{
-			const res = check(schema[0], val);
-			if(res){
-				acc = acc || [];
-				acc[idx] = res;
-			}
-			return acc;
-		}, undefined);
+const ensure = (interface, val, name='')=>{
+	if(disabled || interface === '*' || !interface) return true;
+	if(val && val[INTERFACE] === interface) return true; //Shortcut for cast'd values
+
+	if(Array.isArray(interface)){
+		if(!Array.isArray(val)) throw new Error(`${name} is not an array. Given: ${val}`);
+		val.every((val, idx)=>ensure(interface[0], val, `${name}[${idx}]`));
 	}
-	if(typeof schema === 'object'){
-		if(typeof value !== 'object') return `value is not an object`;
-		for(const key in value){
-			if(!schema[key]) return `${key} does not exist in schema`;
-		}
-		return Object.keys(schema).reduce((acc, key)=>{
-			//TODO: check here for question mark in key, if so, add in optional flag
-			//TODO: Add in Wildcard checks
-			const res = check(schema[key], value[key]);
-			if(res){
-				acc = acc || {};
-				acc[key] = res;
-			}
-			return acc;
-		}, undefined);
+	else if(isObj(interface)){
+		if(!isObj(val)) throw new Error(`${name} is not an object. Given: ${val}`);
+		Object.entries(interface).every(([key,int])=>ensure(int, val[key], `${name}.${key}`));
 	}
-	return `invalid schema type`;
+	else if(interface instanceof RegExp){
+		if(!interface.test(val)) throw new Error(`${name} did not pass regex; ${interface}.`);
+	}
+	else if(isNativeType(interface)){
+		if(val instanceof interface) return true;
+		if(typeof val == typeof interface()) return true;
+		throw new Error(`${name} is not ${getNativeName(interface)}. Given: ${val}`);
+	}
+	else if(typeof interface === 'function'){
+		const res = interface(val, name);
+		if(res === true || undef(res)) return true;
+		throw new Error(`${name} ${res || `did not pass validation.`}`);
+	}
+	return true;
 };
 
-const Picotype = (schema)=>{
-	const newType = (val)=>newType.validate(val);
-	newType.is       = (obj)=>!check(schema, obj);
-	newType.validate = (obj)=>check(schema, obj);
-	newType.ensure   = (obj, force=false)=>{
-		if(Picotype.shouldThrow || force){
-			const result = check(schema, obj);
-			if(result) throw new Error(JSON.stringify(result, null, '  '));
+const is = (type, val, name)=>{ try{ ensure(type, val, name); }catch(err){ return false; } return true;};
+
+const opt = (type)=>(val, name)=>undef(val) || ensure(type, val, name);
+const or = (...types)=>(val, name)=>types.some((type)=>is(type, val, name));
+
+const wrap = (argTypes, func, returnType)=>{
+
+	if(disabled) return func;
+	return (...args)=>{
+		if(argTypes) argTypes.map((int, idx)=>ensure(int, args[idx], `arg${idx}`));
+		const result = func(...args);
+		if(returnType){
+			if(result instanceof Promise) return result.then((x)=>{
+				ensure(returnType, x, 'Return Value');
+				return x;
+			});
+			ensure(returnType, result, 'Return Value');
 		}
-		return obj;
-	};
-	newType.schema=()=>schema;
-	Object.defineProperty(newType, 'isGeneratedType', {value : true});
-	return newType;
+		return result;
+	}
 };
 
-Picotype.shouldThrow = true;
+const cast = (interface, initVal)=>{
+	if(disabled) return initVal;
+	if(!undef(initVal)) ensure(interface, initVal);
+	const proxy = new Proxy(initVal || {}, {
+		set: (obj, propName, value)=>{
+			ensure(interface[propName], value, propName);
+			obj[propName] = value;
+			return true;
+		}
+	});
+	proxy[INTERFACE] = interface;
+	return proxy;
+};
+
+const type = (interface)=>ensure.bind(null, interface);
 
 
-module.exports = populateTypes(Picotype);
+module.exports = {
+	INTERFACE,
+
+	ensure, is,
+	opt, or,
+
+	wrap, cast, type,
+
+	disabled
+};
