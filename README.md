@@ -1,12 +1,15 @@
 # 🛂 pico-type
-A tiny custom interface checker for js
+A tiny custom interface checker for js. Easily describe the shape of your data and validate it.
 
+### install
 
-It's incredibly useful to know and validate the shape of your data. `pico-type` provides a very simple and agnostic way to describe and validate your data objects in your project.
+```
+npm install pico-type
+```
 
 ### Example
 ```js
-const {or, opt, is, ensure, types} = require('pico-type');
+const {or, opt, is, ensure} = require('pico-type');
 
 const UserType = {
 	id         : types.uuid,
@@ -35,9 +38,15 @@ const isUserType = is.bind(null, UserType);
 isUserType(user);  // true/false checker for UserTypes now!
 ```
 
-`pico-type` gives you tools for checking data strucutres against interfaces to see if they pass.
+### Features
 
-Define the shape of your data using Native types, functions, arrays, objects, or regex.
+- Interfaces are just simple objects, arrays, functions, or Native primitives
+- Under 100 lines of code
+- Able to disable run-time checks for production/performance
+- Can use `.cast()` to create proxies to do assertion-time checks
+
+
+`pico-type` gives you tools for checking data strucutres against interfaces to see if they pass. Define the shape of your data using Native types, functions, arrays, objects, or regex.
 
 
 ## How To Use
@@ -45,6 +54,12 @@ You define interfaces using a combination of the below types:
 
 #### Wildcard
 If your interface is exactly `'*'`, `picotype` will pass regardless of value.
+
+```js
+ensure('*', 'foo')
+
+```
+
 
 #### Natives
 Any Native Type in js can be used: `String`, `Number`, `Function`, `Date`, `Object`, `Array`, etc.
@@ -94,9 +109,32 @@ ensure({
 }, { nested : { obj : 'doot'}});
 ```
 
+This also lets you easily combine interfaces together.
+
+```js
+
+const AgeType = (val)=>0<val && val<150
+const TagType = {
+	tag : String,
+	ts : or(Date, Number)
+};
+
+const UserType = {
+	name: String,
+	age : AgeType,
+	tags : [TagType]
+}
+
+const UserGroupType = {
+	id : String,
+	users : [UserType],
+};
+```
+
+
 
 #### Function
-Any function can be used as a type. `pico-type` will call the function while validating. If the function returns exactly `true` or `undefined` it's considered a pass. If it returns anything else, it's considered a fail and `pico-type` will use the returned value as the error message.
+Any function can be used as a type. `pico-type` will call the function while validating. If the function returns exactly `true` or `undefined` it's considered a pass. If it returns anything else (or throws an error), it's considered a fail and `pico-type` will use the returned value as the error message.
 
 ```js
 const { ensure } = require('pico-type');
@@ -126,37 +164,52 @@ Returns `true` if the `value` passes the `interface`, otherwise throws with an e
 Returns `true` if the `value` matches the `interface`, `false` if it doesn't
 
 
+### `.enable()` / `.disable()`
+
+Enables or disables `pico-type`'s checks. This makes `.ensure()`, `.is()`, `.wrap()`, and `.cast()` perform fast no-ops
+
+
 ### `.wrap(parameterInterfaces, func, returnInterface)` -> `function`
 Wraps a given function in both parameter and return checks, returns a new veried function.
 
-`parameterInterfaces` is either
-a) an array of interfaces applied to each argument
-b) a keyed object of interfaces which will be matched to the argument names
+`parameterInterfaces` is an array of interfaces applied to each argument
 
 ```js
-const {opt, wrap, types} = require('pico-type');
+const {wrap} = require('pico-type');
+const GeoType = {/*...*/}
+
 
 const geoDistance = wrap(
-	[types.geo, types.geo],
+	[GeoType, GeoType],
 	(point1,    point2)=>{/*...*/},
 	Number
 );
 
-//ParameterIterface can be a named object
-const setAge = wrap(
-	{eventFlag: opt(Boolean), user: UserType},
-	(user, age, eventFlag)=>{
-		/* ... */
-	}
-	//No return checks
-);
-
 //can leave either parameter or return interface blank as well
-const noChecks = wrap(null, (a,b,c)=>{});
+const noChecks = wrap(null, (a,b,c)=>{}, null);
 ```
 
 
+### `.cast(interface, [initVal])`
+
+Creates a [Proxied](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy) object that whenever a property is set on it, it checks against the provided interface.
+
+```js
+let tempUser = cast({
+	name : String,
+	age : AgeType
+});
+
+tempUser.name = true; //Throws an error!
+tempUser.age = -2.3452; //Also throws an error!
+```
+
+You can also pass an initial value into the proxied Object as the second parameter. Under the hood, `pico-type` will skip checks on `cast`'d objects if they are combine in other checks, since their are guaranteed to be passing!
+
+
+
 ## Utils
+
 
 ### `.or(...types)` -> `function(value)`
 Returns a validation function that passes if the `value` passes any one of the provided types.
@@ -179,14 +232,6 @@ const BoolOrNothing = opt(Boolean);
 ```
 
 
-## Builtin Types
-
-pico-type comes with some built-in types for you to use.
-
-- `.email(val)`
-- `.uuid(val)`
-- `.url(val)`
-- `.geo(val)`
 
 
 

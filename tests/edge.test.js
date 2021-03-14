@@ -1,5 +1,5 @@
 
-const {or, opt, is, ensure, types} = require('../pico-type.js');
+const {or, opt, is, ensure} = require('../pico-type.js');
 
 
 module.exports = {
@@ -18,7 +18,6 @@ module.exports = {
 			age      : (val)=>0 < val && val < 150,
 			flagged  : opt(Boolean),
 			created  : or(Number, Date),
-			location : types.geo,
 			meta     : '*'
 		};
 
@@ -36,11 +35,10 @@ module.exports = {
 			age : 49,
 			flagged : false,
 			created : new Date(),
-			location : { lat : -8.48761007, lng : 21.0879393 },
 			meta : { foo : 'some random data'}
 		})
 
-		t.pass();
+
 	},
 
 

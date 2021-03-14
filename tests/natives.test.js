@@ -1,4 +1,3 @@
-const test = require('pico-check');
 const {is, ensure} = require('../pico-type.js');
 
 const map = (obj,fn)=>Object.keys(obj).map((key)=>fn(obj[key],key));
@@ -27,6 +26,36 @@ const types = {
 	object : Object,
 	array : Array,
 }
+
+
+
+// (typeName)=>{
+
+// 	tests[typeName] = {
+// 		passes : (t)=>{
+// 			values[typeName].map(val=>{
+// 				ensure(types[typeName], val)
+// 			})
+// 		},
+// 		throws : Object.entries(types).reduce((acc, [name, type])=>{
+// 			if(name == typeName) return acc;
+
+// 			acc[name] = (t)=>{
+// 				t.throws(()=>{
+
+// 				})
+// 			}
+// 		}, {})
+
+// 		(t)=>{
+
+// 		}
+// 	}
+
+
+// }
+
+
 
 // map(types, (schema, name)=>{
 // 	test.group(name, (test)=>{

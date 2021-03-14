@@ -24,7 +24,7 @@ module.exports = {
 
 		let res = await doot(10);
 
-		t.arm();
+		t.arm('Should error');
 		res = await doot('foo').catch((err)=>{
 			t.disarm()
 		})

@@ -1,14 +1,14 @@
-
 const isNativeType  = (func)=>/\[native code\]/.test(func+'');
 const getNativeName = (func)=>/function (\w+)\(\)/.exec(func+'')[1];
+
 const isObj = (obj)=>obj && typeof obj == 'object' && obj.constructor == Object;
 const undef = (val)=>val==='' || val===null || typeof val === 'undefined';
-const INTERFACE = Symbol('interface');
 
-let disabled = false;
+const INTERFACE = Symbol('interface');
+let DISABLED = false;
 
 const ensure = (interface, val, name='')=>{
-	if(disabled || interface === '*' || !interface) return true;
+	if(DISABLED || interface === '*' || !interface) return true;
 	if(val && val[INTERFACE] === interface) return true; //Shortcut for cast'd values
 
 	if(Array.isArray(interface)){
@@ -41,8 +41,7 @@ const opt = (type)=>(val, name)=>undef(val) || ensure(type, val, name);
 const or = (...types)=>(val, name)=>types.some((type)=>is(type, val, name));
 
 const wrap = (argTypes, func, returnType)=>{
-
-	if(disabled) return func;
+	if(DISABLED) return func;
 	return (...args)=>{
 		if(argTypes) argTypes.map((int, idx)=>ensure(int, args[idx], `arg${idx}`));
 		const result = func(...args);
@@ -58,9 +57,9 @@ const wrap = (argTypes, func, returnType)=>{
 };
 
 const cast = (interface, initVal)=>{
-	if(disabled) return initVal;
+	if(DISABLED) return initVal;
 	if(!undef(initVal)) ensure(interface, initVal);
-	const proxy = new Proxy(initVal || {}, {
+	const proxy = new Proxy(initVal ?? {}, {
 		set: (obj, propName, value)=>{
 			ensure(interface[propName], value, propName);
 			obj[propName] = value;
@@ -71,16 +70,14 @@ const cast = (interface, initVal)=>{
 	return proxy;
 };
 
-const type = (interface)=>ensure.bind(null, interface);
-
-
 module.exports = {
-	INTERFACE,
+	INTERFACE, DISABLED,
 
 	ensure, is,
 	opt, or,
 
-	wrap, cast, type,
+	wrap, cast,
 
-	disabled
+	disable : ()=>DISABLED=true,
+	enable  : ()=>DISABLED=false,
 };
